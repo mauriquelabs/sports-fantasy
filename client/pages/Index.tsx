@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Trophy, Users, TrendingUp, DollarSign } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function Index() {
   return (
@@ -27,15 +28,17 @@ export default function Index() {
             <Button
               size="lg"
               className="bg-primary hover:bg-primary/90 text-white font-bold py-4 px-8 text-lg rounded-lg transition-all duration-200 transform hover:scale-105"
+              asChild
             >
-              Sign Up
+              <Link to="/signup">Sign Up</Link>
             </Button>
             <Button
               variant="outline"
               size="lg"
               className="border-white text-white bg-transparent hover:bg-white hover:text-gray-900 font-bold py-4 px-8 text-lg rounded-lg transition-all duration-200 transform hover:scale-105"
+              asChild
             >
-              Log In
+              <Link to="/login">Log In</Link>
             </Button>
           </div>
         </div>
