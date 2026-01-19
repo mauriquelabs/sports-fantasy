@@ -100,3 +100,42 @@ export const deleteLeague = async (leagueId: string): Promise<void> => {
 
   if (error) throw error;
 };
+
+// Generate/regenerate invite code for a league
+export const generateInviteCode = async (leagueId: string): Promise<string> => {
+  const { data, error } = await supabase.rpc("generate_league_invite_code", {
+    p_league_id: leagueId,
+  });
+
+  if (error) throw error;
+  return data.invite_code;
+};
+
+// Join a league by invite code
+export const joinLeagueByCode = async (
+  inviteCode: string,
+  teamName: string
+): Promise<{ league_id: string; team_id: string }> => {
+  const { data, error } = await supabase.rpc("join_league_by_code", {
+    p_invite_code: inviteCode.toUpperCase(),
+    p_team_name: teamName,
+  });
+
+  if (error) throw error;
+  return {
+    league_id: data.league_id,
+    team_id: data.team_id,
+  };
+};
+
+// Get league by invite code
+export const getLeagueByInviteCode = async (inviteCode: string): Promise<League> => {
+  const { data, error } = await supabase
+    .from("leagues")
+    .select("*")
+    .eq("invite_code", inviteCode.toUpperCase())
+    .single();
+
+  if (error) throw error;
+  return data;
+};

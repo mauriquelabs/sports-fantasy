@@ -6,7 +6,8 @@ import { Trophy, Users, Plus, LogOut, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { CreateLeagueDialog } from "@/components/CreateLeagueDialog";
-import { getUserLeagues, type League } from "@/lib/leagues";
+import { JoinLeagueDialog } from "@/components/JoinLeagueDialog";
+import { getUserLeagues, generateInviteCode, type League } from "@/lib/leagues";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
@@ -16,6 +17,8 @@ export default function Dashboard() {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
     loadLeagues();
@@ -45,6 +48,30 @@ export default function Dashboard() {
 
   const handleLeagueCreated = (league: League) => {
     setLeagues([league, ...leagues]);
+  };
+
+  const handleLeagueJoined = (league: League) => {
+    loadLeagues(); // Refresh to show the new league
+  };
+
+  const handleGenerateInviteCode = async (leagueId: string) => {
+    try {
+      const code = await generateInviteCode(leagueId);
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      toast({
+        title: "Invite code copied!",
+        description: `Invite code ${code} has been copied to clipboard.`,
+      });
+      setTimeout(() => setCopiedCode(null), 3000);
+      loadLeagues(); // Refresh to show updated code
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate invite code",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -137,7 +164,11 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" className="w-full">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setJoinDialogOpen(true)}
+              >
                 <Users className="mr-2 h-4 w-4" />
                 Join League
               </Button>
@@ -189,6 +220,32 @@ export default function Dashboard() {
                         <span className="text-muted-foreground">Status:</span>
                         <span className="font-medium capitalize">{league.draft_status}</span>
                       </div>
+                      {league.invite_code && (
+                        <div className="flex items-center justify-between p-2 bg-muted rounded-md">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Invite Code</p>
+                            <p className="font-mono font-semibold">{league.invite_code}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleGenerateInviteCode(league.id)}
+                            className="h-8"
+                          >
+                            {copiedCode === league.invite_code ? "Copied!" : "Copy"}
+                          </Button>
+                        </div>
+                      )}
+                      {!league.invite_code && league.commissioner_id === user?.id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleGenerateInviteCode(league.id)}
+                        >
+                          Generate Invite Code
+                        </Button>
+                      )}
                     </div>
                     <Button
                       variant="outline"
@@ -209,6 +266,11 @@ export default function Dashboard() {
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
           onLeagueCreated={handleLeagueCreated}
+        />
+        <JoinLeagueDialog
+          open={joinDialogOpen}
+          onOpenChange={setJoinDialogOpen}
+          onLeagueJoined={handleLeagueJoined}
         />
       </main>
     </div>
