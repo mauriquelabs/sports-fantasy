@@ -1,16 +1,50 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trophy, Users, Plus, LogOut } from "lucide-react";
+import { Trophy, Users, Plus, LogOut, ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { CreateLeagueDialog } from "@/components/CreateLeagueDialog";
+import { getUserLeagues, type League } from "@/lib/leagues";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [leagues, setLeagues] = useState<League[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  useEffect(() => {
+    loadLeagues();
+  }, [user]);
+
+  const loadLeagues = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const userLeagues = await getUserLeagues();
+      setLeagues(userLeagues);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load leagues",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleLeagueCreated = (league: League) => {
+    setLeagues([league, ...leagues]);
   };
 
   return (
@@ -48,8 +82,10 @@ export default function Dashboard() {
               <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">No leagues yet</p>
+              <div className="text-2xl font-bold">{leagues.length}</div>
+              <p className="text-xs text-muted-foreground">
+                {leagues.length === 0 ? "No leagues yet" : `${leagues.length} league${leagues.length !== 1 ? 's' : ''}`}
+              </p>
             </CardContent>
           </Card>
 
@@ -86,7 +122,7 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full">
+              <Button className="w-full" onClick={() => setCreateDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Create League
               </Button>
@@ -112,14 +148,68 @@ export default function Dashboard() {
         {/* My Leagues Section */}
         <div className="mt-8">
           <h3 className="text-xl font-bold text-gray-900 mb-4">My Leagues</h3>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-gray-500 py-8">
-                You haven't joined any leagues yet. Create or join a league to get started!
-              </p>
-            </CardContent>
-          </Card>
+          {loading ? (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-gray-500 py-8">Loading leagues...</p>
+              </CardContent>
+            </Card>
+          ) : leagues.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-gray-500 py-8">
+                  You haven't joined any leagues yet. Create or join a league to get started!
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {leagues.map((league) => (
+                <Card key={league.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      {league.name}
+                      {league.commissioner_id === user?.id && (
+                        <Badge variant="secondary">Commissioner</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {league.description || "No description"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 mb-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Teams:</span>
+                        <span className="font-medium">
+                          {league.current_teams} / {league.max_teams}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className="font-medium capitalize">{league.draft_status}</span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => navigate(`/draft?league=${league.id}`)}
+                    >
+                      View League
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
+
+        <CreateLeagueDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+          onLeagueCreated={handleLeagueCreated}
+        />
       </main>
     </div>
   );
