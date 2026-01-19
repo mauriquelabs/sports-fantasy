@@ -87,6 +87,13 @@ export default function Draft() {
     }
   }, [draftData?.state?.current_pick, draftData?.state?.current_round]);
 
+  // Re-evaluate view state when league data is loaded (for max_teams)
+  useEffect(() => {
+    if (draftData && league) {
+      updateViewState(draftData);
+    }
+  }, [league?.max_teams]);
+
   const loadDraftState = async () => {
     if (!leagueId) return;
     try {
@@ -113,9 +120,10 @@ export default function Draft() {
       return;
     }
 
+    const maxTeams = league?.max_teams ?? data.state.max_teams ?? 4;
     if (data.state.started) {
       setViewState("draft");
-    } else if (data.teams.length >= 4) {
+    } else if (data.teams.length >= maxTeams) {
       setViewState("waiting");
     } else {
       setViewState("registration");
@@ -360,7 +368,7 @@ export default function Draft() {
             <CardHeader>
               <CardTitle>Register Your Team</CardTitle>
               <CardDescription>
-                Enter your team name to join the draft (max 4 teams)
+                Enter your team name to join the draft (max {league?.max_teams ?? 12} teams)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -370,11 +378,11 @@ export default function Draft() {
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleRegisterTeam()}
-                  disabled={loading || draftData.teams.length >= 4}
+                  disabled={loading || draftData.teams.length >= (league?.max_teams ?? 12)}
                 />
                 <Button
                   onClick={handleRegisterTeam}
-                  disabled={loading || draftData.teams.length >= 4 || !teamName.trim()}
+                  disabled={loading || draftData.teams.length >= (league?.max_teams ?? 12) || !teamName.trim()}
                 >
                   Register
                 </Button>
@@ -382,7 +390,7 @@ export default function Draft() {
               {draftData.teams.length > 0 && (
                 <div className="pt-4 border-t">
                   <p className="text-sm text-gray-600 mb-2">
-                    Registered Teams ({draftData.teams.length}/4):
+                    Registered Teams ({draftData.teams.length}/{league?.max_teams ?? 12}):
                   </p>
                   <div className="space-y-1">
                     {draftData.teams.map((team) => (
