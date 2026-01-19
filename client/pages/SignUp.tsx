@@ -54,10 +54,7 @@ export default function SignUp() {
         title: "Success!",
         description: "Account created! Please check your email to verify your account.",
       });
-      // Navigate to login after a short delay
-      setTimeout(() => {
-        navigate("/login");
-      }, 2000);
+      navigate("/verify-email");
     }
   };
 
