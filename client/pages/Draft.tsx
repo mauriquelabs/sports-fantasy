@@ -23,6 +23,7 @@ import { Users, Play, Trophy, AlertCircle, CheckCircle2, Clock, ArrowLeft, Trash
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { DraftOrderTable } from "@/components/DraftOrderTable";
 
 type ViewState = "registration" | "waiting" | "draft";
 
@@ -93,6 +94,17 @@ export default function Draft() {
       updateViewState(draftData);
     }
   }, [league?.max_teams]);
+
+  // Auto-detect user's team name if they have one in this league
+  useEffect(() => {
+    if (!user || !draftData?.teams.length) return;
+    
+    // Find the user's team in this league
+    const userTeam = draftData.teams.find((team) => team.owner_id === user.id);
+    if (userTeam && !myTeamName) {
+      setMyTeamName(userTeam.name);
+    }
+  }, [user, draftData?.teams, myTeamName]);
 
   const loadDraftState = async () => {
     if (!leagueId) return;
@@ -213,8 +225,12 @@ export default function Draft() {
       return;
     }
 
-    if (nextTeam !== myTeamName) {
+    // Re-check whose turn it is from the database before making pick
+    const currentNextTeam = await getNextTeam();
+    if (currentNextTeam !== myTeamName) {
       setError("It's not your turn!");
+      setNextTeam(currentNextTeam); // Update UI to reflect actual state
+      await loadDraftState(); // Refresh all state
       return;
     }
 
@@ -226,10 +242,13 @@ export default function Draft() {
         title: "Pick Made!",
         description: result.message,
       });
-      // State will update via subscription
+      // Refresh state after pick
+      await loadDraftState();
     } catch (err: any) {
       const errorMsg = err.message || "Failed to make pick";
       setError(errorMsg);
+      // Refresh state to get current turn
+      await loadDraftState();
       toast({
         title: "Error",
         description: errorMsg,
@@ -494,60 +513,62 @@ export default function Draft() {
         {/* Draft View */}
         {viewState === "draft" && draftData.state && (
           <div className="space-y-6">
-            {/* Draft Status Bar */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div>
-                    <div className="text-sm text-gray-600">Round</div>
-                    <div className="text-2xl font-bold">
-                      {draftData.state.current_round} / {draftData.state.total_rounds}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-600">Pick</div>
-                    <div className="text-2xl font-bold">
-                      {draftData.state.current_pick + 1} / {draftData.state.max_teams * draftData.state.total_rounds}
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm text-gray-600 mb-2">Current Turn</div>
-                    <div className="flex items-center gap-2">
-                      {nextTeam ? (
-                        <>
-                          <Badge
-                            variant={isMyTurn ? "default" : "secondary"}
-                            className={cn(
-                              isMyTurn && "bg-green-500 hover:bg-green-600"
-                            )}
-                          >
-                            {isMyTurn ? (
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                            ) : (
-                              <Clock className="h-3 w-3 mr-1" />
-                            )}
-                            {nextTeam}
-                          </Badge>
-                          {isMyTurn && (
-                            <span className="text-sm text-green-600 font-semibold">
-                              Your turn!
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-gray-500">Calculating...</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {isDraftComplete ? (
+            {/* Draft Status Bar - only show during active draft */}
+            {!isDraftComplete && (
               <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                      <div className="text-sm text-gray-600">Round</div>
+                      <div className="text-2xl font-bold">
+                        {draftData.state.current_round} / {draftData.state.total_rounds}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600">Pick</div>
+                      <div className="text-2xl font-bold">
+                        {draftData.state.current_pick + 1} / {draftData.state.max_teams * draftData.state.total_rounds}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm text-gray-600 mb-2">Current Turn</div>
+                      <div className="flex items-center gap-2">
+                        {nextTeam ? (
+                          <>
+                            <Badge
+                              variant={isMyTurn ? "default" : "secondary"}
+                              className={cn(
+                                isMyTurn && "bg-green-500 hover:bg-green-600"
+                              )}
+                            >
+                              {isMyTurn ? (
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                              ) : (
+                                <Clock className="h-3 w-3 mr-1" />
+                              )}
+                              {nextTeam}
+                            </Badge>
+                            {isMyTurn && (
+                              <span className="text-sm text-green-600 font-semibold">
+                                Your turn!
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-gray-500">Calculating...</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {isDraftComplete && (
+              <Card className="mb-6">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Trophy className="h-5 w-5" />
+                    <Trophy className="h-5 w-5 text-yellow-500" />
                     Draft Complete!
                   </CardTitle>
                 </CardHeader>
@@ -557,94 +578,140 @@ export default function Draft() {
                   </p>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Available Players */}
-                <Card className="lg:col-span-1">
-                  <CardHeader>
-                    <CardTitle>Available Players</CardTitle>
-                    <CardDescription>
-                      {availablePlayers.length} players remaining
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {availablePlayers.length === 0 ? (
-                        <p className="text-sm text-gray-500 text-center py-4">
-                          No players available
-                        </p>
-                      ) : (
-                        availablePlayers.map((player) => {
-                          const playerName = getPlayerName(player);
-                          return (
-                            <Button
-                              key={player.id}
-                              variant="outline"
-                              className="w-full justify-start"
-                              onClick={() => handleMakePick(playerName)}
-                              disabled={!isMyTurn || loading}
-                            >
-                              {playerName}
-                            </Button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Draft Board */}
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Draft Board</CardTitle>
-                    <CardDescription>All picks by team</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {draftData.teams.map((team) => {
-                        const teamPicks = picksByTeam[team.name] || [];
-                        return (
-                          <div
-                            key={team.id}
-                            className={cn(
-                              "border rounded-lg p-4",
-                              isMyTeam(team) && "border-blue-500 bg-blue-50"
-                            )}
-                          >
-                            <div className="flex items-center gap-2 mb-3">
-                              <Users className="h-4 w-4" />
-                              <span className="font-semibold">{team.name}</span>
-                              {isMyTeam(team) && (
-                                <Badge variant="secondary">You</Badge>
-                              )}
-                            </div>
-                            <div className="space-y-1">
-                              {teamPicks.length === 0 ? (
-                                <p className="text-sm text-gray-500">No picks yet</p>
-                              ) : (
-                                teamPicks
-                                  .sort((a, b) => a.pick_number - b.pick_number)
-                                  .map((pick) => (
-                                    <div
-                                      key={pick.id}
-                                      className="text-sm flex items-center gap-2"
-                                    >
-                                      <Badge variant="outline" className="text-xs">
-                                        R{pick.round} P{pick.pick_number}
-                                      </Badge>
-                                      {pick.playerName}
-                                    </div>
-                                  ))
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             )}
+
+            {/* Available Players - Full width, primary focus (only show if draft not complete) */}
+            {!isDraftComplete && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Available Players</CardTitle>
+                  <CardDescription>
+                    {availablePlayers.length} players remaining
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="pb-2 font-medium text-sm text-gray-600">Player</th>
+                          <th className="pb-2 font-medium text-sm text-gray-600 text-center">Stats</th>
+                          <th className="pb-2 font-medium text-sm text-gray-600 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {availablePlayers.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="py-8 text-center text-gray-500">
+                              No players available
+                            </td>
+                          </tr>
+                        ) : (
+                          availablePlayers.map((player) => {
+                            const playerName = getPlayerName(player);
+                            return (
+                              <tr key={player.id} className="hover:bg-gray-50">
+                                <td className="py-3">
+                                  <span className="font-medium">{playerName}</span>
+                                </td>
+                                <td className="py-3 text-center text-sm text-gray-500">
+                                  {/* Placeholder for player stats */}
+                                  —
+                                </td>
+                                <td className="py-3 text-right">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleMakePick(playerName)}
+                                    disabled={!isMyTurn || loading}
+                                  >
+                                    Draft
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Bottom row: Draft Board (larger) + Draft Order (smaller) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Draft Board - takes 2/3 width */}
+              <Card className={isDraftComplete ? "lg:col-span-3" : "lg:col-span-2"}>
+                <CardHeader>
+                  <CardTitle>Draft Board</CardTitle>
+                  <CardDescription>All picks by team</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {draftData.teams.map((team) => {
+                      const teamPicks = picksByTeam[team.name] || [];
+                      return (
+                        <div
+                          key={team.id}
+                          className={cn(
+                            "border rounded-lg p-4",
+                            isMyTeam(team) && "border-blue-500 bg-blue-50"
+                          )}
+                        >
+                          <div className="flex items-center gap-2 mb-3">
+                            <Users className="h-4 w-4" />
+                            <span className="font-semibold">{team.name}</span>
+                            {isMyTeam(team) && (
+                              <Badge variant="secondary">You</Badge>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {teamPicks.length === 0 ? (
+                              <p className="text-sm text-gray-500">No picks yet</p>
+                            ) : (
+                              teamPicks
+                                .sort((a, b) => a.pick_number - b.pick_number)
+                                .map((pick) => (
+                                  <div
+                                    key={pick.id}
+                                    className="text-sm flex items-center gap-2"
+                                  >
+                                    <Badge variant="outline" className="text-xs">
+                                      R{pick.round} P{pick.pick_number}
+                                    </Badge>
+                                    {pick.playerName}
+                                  </div>
+                                ))
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Draft Order - Compact, takes 1/3 width */}
+              {!isDraftComplete && draftData.state.draft_order && draftData.state.draft_order.length > 0 && (
+                <DraftOrderTable
+                  teams={draftData.teams}
+                  draftOrder={draftData.state.draft_order}
+                  currentPick={draftData.state.current_pick}
+                  currentRound={draftData.state.current_round}
+                  totalRounds={draftData.state.total_rounds}
+                  myTeamName={myTeamName}
+                  userId={user?.id}
+                  picks={draftData.picks.map((pick) => {
+                    const player = draftData.players.find((p) => p.id === pick.player_id);
+                    return {
+                      ...pick,
+                      player_name: player ? getPlayerName(player) : "Unknown",
+                    };
+                  })}
+                  compact
+                />
+              )}
+            </div>
           </div>
         )}
       </div>

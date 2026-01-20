@@ -14,6 +14,11 @@ import { Label } from "@/components/ui/label";
 import { joinLeagueByCode, getLeagueByInviteCode, type League } from "@/lib/leagues";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
+
+interface LeaguePreview extends League {
+  team_count: number;
+}
 
 interface JoinLeagueDialogProps {
   open: boolean;
@@ -32,7 +37,7 @@ export function JoinLeagueDialog({
   onLeagueJoined,
 }: JoinLeagueDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [leaguePreview, setLeaguePreview] = useState<League | null>(null);
+  const [leaguePreview, setLeaguePreview] = useState<LeaguePreview | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const {
@@ -56,7 +61,18 @@ export function JoinLeagueDialog({
       if (inviteCode && inviteCode.length === 6) {
         try {
           const league = await getLeagueByInviteCode(inviteCode.toUpperCase());
-          setLeaguePreview(league);
+          
+          // Get team count
+          const { count } = await supabase
+            .from("teams")
+            .select("*", { count: "exact", head: true })
+            .eq("league_id", league.id)
+            .or("is_bot.is.null,is_bot.eq.false");
+          
+          setLeaguePreview({
+            ...league,
+            team_count: count || 0,
+          });
         } catch (error) {
           setLeaguePreview(null);
         }
@@ -134,7 +150,7 @@ export function JoinLeagueDialog({
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  {leaguePreview.current_teams} / {leaguePreview.max_teams} teams
+                  {leaguePreview.team_count} / {leaguePreview.max_teams} teams
                 </p>
               </div>
             )}
