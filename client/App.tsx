@@ -13,6 +13,8 @@ import SignUp from "./pages/SignUp";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Draft from "./pages/Draft";
+import LeaguePage from "./pages/League";
+import MockDraftPage from "./pages/MockDraft";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +35,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/league/:leagueId"
+              element={
+                <ProtectedRoute>
+                  <LeaguePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mock-draft/:mockDraftId"
+              element={
+                <ProtectedRoute>
+                  <MockDraftPage />
                 </ProtectedRoute>
               }
             />

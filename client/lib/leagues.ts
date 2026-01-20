@@ -6,10 +6,10 @@ export interface League {
   description: string | null;
   commissioner_id: string;
   max_teams: number;
-  current_teams: number;
   draft_date: string | null;
   draft_status: "pending" | "in_progress" | "completed";
   invite_code: string | null;
+  is_mock: boolean;
   settings: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -31,7 +31,6 @@ export const createLeague = async (
       description: description || null,
       commissioner_id: user.id,
       max_teams: maxTeams,
-      current_teams: 0,
     })
     .select()
     .single();

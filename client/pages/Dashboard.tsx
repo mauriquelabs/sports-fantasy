@@ -8,14 +8,22 @@ import { useNavigate } from "react-router-dom";
 import { CreateLeagueDialog } from "@/components/CreateLeagueDialog";
 import { JoinLeagueDialog } from "@/components/JoinLeagueDialog";
 import { getUserLeagues, getUserTeams, generateInviteCode, type League, type Team } from "@/lib/leagues";
+import { getActiveMockDraftsCount } from "@/lib/mockDraft";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+
+// League with computed team count
+interface LeagueWithTeamCount extends League {
+  team_count: number;
+}
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [leagues, setLeagues] = useState<League[]>([]);
+  const [leagues, setLeagues] = useState<LeagueWithTeamCount[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [activeMockDrafts, setActiveMockDrafts] = useState(0);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
@@ -29,11 +37,38 @@ export default function Dashboard() {
     if (!user) return;
     try {
       setLoading(true);
-      const [userLeagues, userTeams] = await Promise.all([
+      const [userLeagues, userTeams, mockDraftsCount] = await Promise.all([
         getUserLeagues(),
         getUserTeams(),
+        getActiveMockDraftsCount(),
       ]);
-      setLeagues(userLeagues);
+      
+      setActiveMockDrafts(mockDraftsCount);
+      
+      // Filter out mock leagues from the old system
+      const realLeagues = userLeagues.filter(l => !l.is_mock);
+      
+      // Fetch team counts for each league
+      const leagueIds = realLeagues.map(l => l.id);
+      const { data: teamCounts } = await supabase
+        .from("teams")
+        .select("league_id")
+        .in("league_id", leagueIds)
+        .or("is_bot.is.null,is_bot.eq.false");
+      
+      // Count teams per league
+      const countMap = new Map<string, number>();
+      teamCounts?.forEach(t => {
+        countMap.set(t.league_id, (countMap.get(t.league_id) || 0) + 1);
+      });
+      
+      // Add team counts to leagues
+      const leaguesWithCounts: LeagueWithTeamCount[] = realLeagues.map(l => ({
+        ...l,
+        team_count: countMap.get(l.id) || 0,
+      }));
+      
+      setLeagues(leaguesWithCounts);
       setTeams(userTeams);
     } catch (error: any) {
       toast({
@@ -50,7 +85,27 @@ export default function Dashboard() {
     if (!user) return;
     try {
       const userLeagues = await getUserLeagues();
-      setLeagues(userLeagues);
+      const realLeagues = userLeagues.filter(l => !l.is_mock);
+      
+      // Fetch team counts
+      const leagueIds = realLeagues.map(l => l.id);
+      const { data: teamCounts } = await supabase
+        .from("teams")
+        .select("league_id")
+        .in("league_id", leagueIds)
+        .or("is_bot.is.null,is_bot.eq.false");
+      
+      const countMap = new Map<string, number>();
+      teamCounts?.forEach(t => {
+        countMap.set(t.league_id, (countMap.get(t.league_id) || 0) + 1);
+      });
+      
+      const leaguesWithCounts: LeagueWithTeamCount[] = realLeagues.map(l => ({
+        ...l,
+        team_count: countMap.get(l.id) || 0,
+      }));
+      
+      setLeagues(leaguesWithCounts);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -154,14 +209,20 @@ export default function Dashboard() {
               <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {leagues.filter((l) => l.draft_status === "in_progress").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {leagues.filter((l) => l.draft_status === "in_progress").length === 0
-                  ? "No active drafts"
-                  : `${leagues.filter((l) => l.draft_status === "in_progress").length} active draft${leagues.filter((l) => l.draft_status === "in_progress").length !== 1 ? 's' : ''}`}
-              </p>
+              {(() => {
+                const leagueDrafts = leagues.filter((l) => l.draft_status === "in_progress").length;
+                const totalActive = leagueDrafts + activeMockDrafts;
+                return (
+                  <>
+                    <div className="text-2xl font-bold">{totalActive}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {totalActive === 0
+                        ? "No active drafts"
+                        : `${leagueDrafts > 0 ? `${leagueDrafts} league` : ''}${leagueDrafts > 0 && activeMockDrafts > 0 ? ', ' : ''}${activeMockDrafts > 0 ? `${activeMockDrafts} mock` : ''}`}
+                    </p>
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
@@ -240,14 +301,28 @@ export default function Dashboard() {
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Teams:</span>
                         <span className="font-medium">
-                          {league.current_teams} / {league.max_teams}
+                          {league.team_count} / {league.max_teams}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Status:</span>
-                        <span className="font-medium capitalize">{league.draft_status}</span>
+                        <Badge 
+                          variant={
+                            league.draft_status === "completed" 
+                              ? "default" 
+                              : league.draft_status === "in_progress" 
+                              ? "destructive" 
+                              : "outline"
+                          }
+                        >
+                          {league.draft_status === "pending" 
+                            ? "Draft Pending" 
+                            : league.draft_status === "in_progress" 
+                            ? "Drafting" 
+                            : "Complete"}
+                        </Badge>
                       </div>
-                      {league.invite_code && (
+                      {league.invite_code && league.commissioner_id === user?.id && (
                         <div className="flex items-center justify-between p-2 bg-muted rounded-md">
                           <div>
                             <p className="text-xs text-muted-foreground">Invite Code</p>
@@ -256,7 +331,10 @@ export default function Dashboard() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleGenerateInviteCode(league.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerateInviteCode(league.id);
+                            }}
                             className="h-8"
                           >
                             {copiedCode === league.invite_code ? "Copied!" : "Copy"}
@@ -268,16 +346,19 @@ export default function Dashboard() {
                           variant="outline"
                           size="sm"
                           className="w-full"
-                          onClick={() => handleGenerateInviteCode(league.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGenerateInviteCode(league.id);
+                          }}
                         >
                           Generate Invite Code
                         </Button>
                       )}
                     </div>
                     <Button
-                      variant="outline"
+                      variant="default"
                       className="w-full"
-                      onClick={() => navigate(`/draft?league=${league.id}`)}
+                      onClick={() => navigate(`/league/${league.id}`)}
                     >
                       View League
                       <ArrowRight className="ml-2 h-4 w-4" />
