@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { DraftOrderTable } from "@/components/DraftOrderTable";
+import { AvailablePlayersTable } from "@/components/AvailablePlayersTable";
 
 type ViewState = "registration" | "waiting" | "draft";
 
@@ -582,60 +583,16 @@ export default function Draft() {
 
             {/* Available Players - Full width, primary focus (only show if draft not complete) */}
             {!isDraftComplete && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Available Players</CardTitle>
-                  <CardDescription>
-                    {availablePlayers.length} players remaining
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b text-left">
-                          <th className="pb-2 font-medium text-sm text-gray-600">Player</th>
-                          <th className="pb-2 font-medium text-sm text-gray-600 text-center">Stats</th>
-                          <th className="pb-2 font-medium text-sm text-gray-600 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {availablePlayers.length === 0 ? (
-                          <tr>
-                            <td colSpan={3} className="py-8 text-center text-gray-500">
-                              No players available
-                            </td>
-                          </tr>
-                        ) : (
-                          availablePlayers.map((player) => {
-                            const playerName = getPlayerName(player);
-                            return (
-                              <tr key={player.id} className="hover:bg-gray-50">
-                                <td className="py-3">
-                                  <span className="font-medium">{playerName}</span>
-                                </td>
-                                <td className="py-3 text-center text-sm text-gray-500">
-                                  {/* Placeholder for player stats */}
-                                  —
-                                </td>
-                                <td className="py-3 text-right">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleMakePick(playerName)}
-                                    disabled={!isMyTurn || loading}
-                                  >
-                                    Draft
-                                  </Button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+              <AvailablePlayersTable
+                players={availablePlayers.map((player) => ({
+                  id: player.id,
+                  name: getPlayerName(player),
+                  position: undefined, // DraftPlayer doesn't have position field exposed
+                }))}
+                onDraft={(_playerId, playerName) => handleMakePick(playerName)}
+                disabled={loading}
+                isMyTurn={isMyTurn}
+              />
             )}
 
             {/* Bottom row: Draft Board (larger) + Draft Order (smaller) */}

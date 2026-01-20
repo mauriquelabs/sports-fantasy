@@ -32,12 +32,10 @@ import {
 } from "@/lib/mockDraft";
 import { getLeague, type League } from "@/lib/leagues";
 import { DraftOrderTable } from "@/components/DraftOrderTable";
-
-interface AvailablePlayer {
-  id: string;
-  name: string;
-  position?: string;
-}
+import {
+  AvailablePlayersTable,
+  type Player as AvailablePlayer,
+} from "@/components/AvailablePlayersTable";
 
 export default function MockDraftPage() {
   const { mockDraftId } = useParams<{ mockDraftId: string }>();
@@ -341,65 +339,14 @@ export default function MockDraftPage() {
 
         {/* Available Players - Full width, primary focus (only show if draft not complete) */}
         {!isDraftComplete && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Available Players</CardTitle>
-              <CardDescription>
-                {availablePlayers.length} players remaining
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b text-left">
-                      <th className="pb-2 font-medium text-sm text-gray-600">Player</th>
-                      <th className="pb-2 font-medium text-sm text-gray-600 text-center">Position</th>
-                      <th className="pb-2 font-medium text-sm text-gray-600 text-center">Stats</th>
-                      <th className="pb-2 font-medium text-sm text-gray-600 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {availablePlayers.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="py-8 text-center text-gray-500">
-                          No players available
-                        </td>
-                      </tr>
-                    ) : (
-                      availablePlayers.map((player) => (
-                        <tr key={player.id} className="hover:bg-gray-50">
-                          <td className="py-3">
-                            <span className="font-medium">{player.name}</span>
-                          </td>
-                          <td className="py-3 text-center">
-                            {player.position && (
-                              <Badge variant="secondary">
-                                {player.position}
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="py-3 text-center text-sm text-gray-500">
-                            {/* Placeholder for player stats */}
-                            —
-                          </td>
-                          <td className="py-3 text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => handleMakePick(player.id, player.name)}
-                              disabled={!isMyTurn || makingPick || botProcessing}
-                            >
-                              Draft
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="mb-6">
+            <AvailablePlayersTable
+              players={availablePlayers}
+              onDraft={handleMakePick}
+              disabled={makingPick || botProcessing}
+              isMyTurn={isMyTurn}
+            />
+          </div>
         )}
 
         {/* Bottom row: Draft Board (larger) + Draft Order (smaller) */}
