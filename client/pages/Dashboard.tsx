@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { CreateLeagueDialog } from "@/components/CreateLeagueDialog";
 import { JoinLeagueDialog } from "@/components/JoinLeagueDialog";
 import { getUserLeagues, getUserTeams, generateInviteCode, type League, type Team } from "@/lib/leagues";
+import { getActiveMockDraftsCount } from "@/lib/mockDraft";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [leagues, setLeagues] = useState<LeagueWithTeamCount[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [activeMockDrafts, setActiveMockDrafts] = useState(0);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
@@ -35,10 +37,13 @@ export default function Dashboard() {
     if (!user) return;
     try {
       setLoading(true);
-      const [userLeagues, userTeams] = await Promise.all([
+      const [userLeagues, userTeams, mockDraftsCount] = await Promise.all([
         getUserLeagues(),
         getUserTeams(),
+        getActiveMockDraftsCount(),
       ]);
+      
+      setActiveMockDrafts(mockDraftsCount);
       
       // Filter out mock leagues from the old system
       const realLeagues = userLeagues.filter(l => !l.is_mock);
@@ -204,14 +209,20 @@ export default function Dashboard() {
               <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {leagues.filter((l) => l.draft_status === "in_progress").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {leagues.filter((l) => l.draft_status === "in_progress").length === 0
-                  ? "No active drafts"
-                  : `${leagues.filter((l) => l.draft_status === "in_progress").length} active draft${leagues.filter((l) => l.draft_status === "in_progress").length !== 1 ? 's' : ''}`}
-              </p>
+              {(() => {
+                const leagueDrafts = leagues.filter((l) => l.draft_status === "in_progress").length;
+                const totalActive = leagueDrafts + activeMockDrafts;
+                return (
+                  <>
+                    <div className="text-2xl font-bold">{totalActive}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {totalActive === 0
+                        ? "No active drafts"
+                        : `${leagueDrafts > 0 ? `${leagueDrafts} league` : ''}${leagueDrafts > 0 && activeMockDrafts > 0 ? ', ' : ''}${activeMockDrafts > 0 ? `${activeMockDrafts} mock` : ''}`}
+                    </p>
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>

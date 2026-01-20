@@ -279,3 +279,22 @@ export const cancelMockDraft = async (mockDraftId: string): Promise<void> => {
 
   if (error) throw error;
 };
+
+// Get count of user's active mock drafts (in_progress status)
+export const getActiveMockDraftsCount = async (): Promise<number> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const { count, error } = await supabase
+    .from("mock_drafts")
+    .select("*", { count: "exact", head: true })
+    .eq("creator_id", user.id)
+    .eq("status", "in_progress");
+
+  if (error) {
+    console.error("Error fetching active mock drafts count:", error);
+    return 0;
+  }
+
+  return count || 0;
+};
