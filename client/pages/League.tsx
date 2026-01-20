@@ -94,13 +94,21 @@ export default function LeaguePage() {
   const handleCopyInviteCode = async () => {
     if (!league?.invite_code) return;
 
-    await navigator.clipboard.writeText(league.invite_code);
-    setCopiedCode(true);
-    toast({
-      title: "Copied!",
-      description: "Invite code copied to clipboard",
-    });
-    setTimeout(() => setCopiedCode(false), 2000);
+    const { copyToClipboard } = await import("@/lib/clipboard");
+    const copied = await copyToClipboard(league.invite_code);
+    if (copied) {
+      setCopiedCode(true);
+      toast({
+        title: "Copied!",
+        description: "Invite code copied to clipboard",
+      });
+      setTimeout(() => setCopiedCode(false), 2000);
+    } else {
+      toast({
+        title: "Invite Code",
+        description: `Your code is: ${league.invite_code}`,
+      });
+    }
   };
 
   const handleGenerateInviteCode = async () => {
@@ -108,11 +116,19 @@ export default function LeaguePage() {
 
     try {
       const code = await generateInviteCode(leagueId);
-      await navigator.clipboard.writeText(code);
-      toast({
-        title: "Invite code generated!",
-        description: `Code ${code} copied to clipboard`,
-      });
+      const { copyToClipboard } = await import("@/lib/clipboard");
+      const copied = await copyToClipboard(code);
+      if (copied) {
+        toast({
+          title: "Invite code generated!",
+          description: `Code ${code} copied to clipboard`,
+        });
+      } else {
+        toast({
+          title: "Invite code generated",
+          description: `Your code is: ${code}`,
+        });
+      }
       loadLeagueData();
     } catch (err: any) {
       toast({

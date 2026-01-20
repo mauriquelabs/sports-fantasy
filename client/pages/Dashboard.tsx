@@ -131,14 +131,22 @@ export default function Dashboard() {
   const handleGenerateInviteCode = async (leagueId: string) => {
     try {
       const code = await generateInviteCode(leagueId);
-      await navigator.clipboard.writeText(code);
-      setCopiedCode(code);
-      toast({
-        title: "Invite code copied!",
-        description: `Invite code ${code} has been copied to clipboard.`,
-      });
-      setTimeout(() => setCopiedCode(null), 3000);
-      loadLeagues(); // Refresh to show updated code
+      const { copyToClipboard } = await import("@/lib/clipboard");
+      const copied = await copyToClipboard(code);
+      if (copied) {
+        setCopiedCode(code);
+        toast({
+          title: "Invite code copied!",
+          description: `Invite code ${code} has been copied to clipboard.`,
+        });
+        setTimeout(() => setCopiedCode(null), 3000);
+      } else {
+        toast({
+          title: "Invite code generated",
+          description: `Your invite code is: ${code}`,
+        });
+      }
+      loadLeagues();
     } catch (error: any) {
       toast({
         title: "Error",
