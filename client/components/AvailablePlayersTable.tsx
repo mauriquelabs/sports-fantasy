@@ -244,14 +244,14 @@ export function AvailablePlayersTable({
                             Draft
                           </Button>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs overflow-hidden">
+                        <div className="flex items-center gap-1.5 text-[11px] text-gray-500 overflow-hidden">
                           {player.position && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 leading-none shrink-0">
                               {player.position}
                             </Badge>
                           )}
-                          <span className="text-gray-500 whitespace-nowrap">
-                            .{stats.avg.toFixed(3).slice(2)} | {stats.hr}HR | {stats.rbi}RBI
+                          <span className="whitespace-nowrap">
+                            AVG: {stats.avg.toFixed(3)} | HR: {stats.hr} | RBI: {stats.rbi}
                           </span>
                         </div>
                       </div>
